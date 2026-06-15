@@ -358,7 +358,7 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         threading.Thread(target=self._ytdlp_worker, args=(url,), daemon=True).start()
 
     def _ytdlp_worker(self, url: str):
-        out_dir = Path.home() / "Desktop" / "ai-lab"
+        out_dir = Path.home() / "Downloads"
         out_tpl = str(out_dir / "source.%(ext)s")
         cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", out_tpl, url]
         self._log("> yt-dlp: скачиваю аудио...")
