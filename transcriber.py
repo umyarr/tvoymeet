@@ -162,6 +162,18 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             fg_color=C_YTDL, hover_color=C_YTDL_H, width=100, height=34, corner_radius=6,
         ).pack(side="left")
 
+        yt_mode_row = ctk.CTkFrame(c1, fg_color="transparent")
+        yt_mode_row.pack(anchor="w", pady=(6, 0))
+        self.yt_mode = ctk.StringVar(value="audio")
+        ctk.CTkRadioButton(
+            yt_mode_row, text="Только аудио (mp3)", variable=self.yt_mode, value="audio",
+            fg_color=C_ACCENT, hover_color=C_PRIM_H, text_color=C_TEXT,
+        ).pack(side="left", padx=(0, 20))
+        ctk.CTkRadioButton(
+            yt_mode_row, text="Видео (mp4)", variable=self.yt_mode, value="video",
+            fg_color=C_ACCENT, hover_color=C_PRIM_H, text_color=C_TEXT,
+        ).pack(side="left")
+
         # ── Card 2: FFmpeg ───────────────────────────────────────────────────
         c2 = self._card(s)
         self._card_title(c2, "2", "FFmpeg — извлечение аудио")
@@ -360,14 +372,19 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
     def _ytdlp_worker(self, url: str):
         out_dir = Path.home() / "Downloads"
         out_tpl = str(out_dir / "source.%(ext)s")
-        cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", out_tpl, url]
-        self._log("> yt-dlp: скачиваю аудио...")
+        if self.yt_mode.get() == "video":
+            cmd = ["yt-dlp", "-f", "bv*+ba/b", "-o", out_tpl, url]
+            ext, label = "mp4", "видео"
+        else:
+            cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", out_tpl, url]
+            ext, label = "mp3", "аудио"
+        self._log(f"> yt-dlp: скачиваю {label}...")
         res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode == 0:
-            mp3s = sorted(out_dir.glob("*.mp3"), key=lambda f: f.stat().st_mtime, reverse=True)
-            if mp3s:
-                self._set_file(str(mp3s[0]))
-                self._log(f"✓ Скачано: {mp3s[0].name}")
+            files = sorted(out_dir.glob(f"*.{ext}"), key=lambda f: f.stat().st_mtime, reverse=True)
+            if files:
+                self._set_file(str(files[0]))
+                self._log(f"✓ Скачано: {files[0].name}")
             else:
                 self._log("! Файл не найден после скачивания")
         else:
