@@ -52,18 +52,19 @@ def _register_uninstall(exe_path: str, uninstall_cmd: str, install_dir: str) -> 
 
 
 def _create_shortcut(target: str, shortcut_path: str, working_dir: str) -> None:
-    """Create a .lnk shortcut using VBScript."""
-    vbs = f"""
-Set oWS = WScript.CreateObject("WScript.Shell")
-sLinkFile = "{shortcut_path}"
-Set oLink = oWS.CreateShortcut(sLinkFile)
-oLink.TargetPath = "{target}"
-oLink.WorkingDirectory = "{working_dir}"
-oLink.Description = "ТвойMeet — транскрибация аудио и видео"
-oLink.Save
-"""
+    """Create a .lnk shortcut via VBScript written in the system ANSI encoding."""
+    import locale
+    vbs = (
+        'Set oWS = WScript.CreateObject("WScript.Shell")\n'
+        f'Set oLink = oWS.CreateShortcut("{shortcut_path}")\n'
+        f'oLink.TargetPath = "{target}"\n'
+        f'oLink.WorkingDirectory = "{working_dir}"\n'
+        f'oLink.IconLocation = "{target}, 0"\n'
+        'oLink.Save\n'
+    )
+    enc = locale.getpreferredencoding(False)  # cp1251 on Russian Windows
     vbs_path = Path(os.environ.get("TEMP", "C:/Temp")) / "create_shortcut.vbs"
-    vbs_path.write_text(vbs, encoding="utf-8")
+    vbs_path.write_text(vbs, encoding=enc, errors="replace")
     os.system(f'cscript //nologo "{vbs_path}"')
     try:
         vbs_path.unlink()
