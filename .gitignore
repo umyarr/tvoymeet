@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+build/
+dist/
+*.spec
+*.pyc
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.webm
+transcripts_*/
+*.png
+grok api.txt
+Новая папка/
+Новый текстовый документ.txt

@@ -1,0 +1,97 @@
+name: Build TvoyMeet
+
+on:
+  workflow_dispatch:   # запуск вручную кнопкой на GitHub
+  push:
+    tags:
+      - 'v*'           # или автоматически при тэге v1.0, v1.1 и т.д.
+
+jobs:
+  # ── Mac .app ──────────────────────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-latest   # Apple Silicon (M1/M2/M3)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ffmpeg
+        run: |
+          brew install ffmpeg
+          cp $(which ffmpeg) ./ffmpeg
+
+      - name: Install Python deps
+        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller
+
+      - name: Build .app
+        run: |
+          pyinstaller --noconfirm --windowed --name TvoyMeet \
+            --collect-all customtkinter \
+            --collect-all tkinterdnd2 \
+            --add-binary "./ffmpeg:." \
+            --hidden-import faster_whisper \
+            --hidden-import ctranslate2 \
+            transcriber.py
+
+      - name: Zip .app for download
+        run: cd dist && zip -r TvoyMeet-mac.zip TvoyMeet.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TvoyMeet-mac
+          path: dist/TvoyMeet-mac.zip
+          retention-days: 30
+
+  # ── Windows Installer ─────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download ffmpeg essentials
+        shell: pwsh
+        run: |
+          $url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+          $exe = Get-ChildItem ffmpeg_tmp -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          Copy-Item $exe.FullName ./ffmpeg.exe
+          Remove-Item -Recurse -Force ffmpeg.zip, ffmpeg_tmp
+
+      - name: Install Python deps
+        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller
+
+      - name: Build TvoyMeet (onedir)
+        run: |
+          pyinstaller --noconfirm --onedir --windowed --name TvoyMeet `
+            --collect-all customtkinter `
+            --collect-all tkinterdnd2 `
+            --add-binary "ffmpeg.exe;." `
+            --hidden-import faster_whisper `
+            --hidden-import ctranslate2 `
+            transcriber.py
+        shell: pwsh
+
+      - name: Build Installer (onefile)
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name TvoyMeetInstaller `
+            --add-data "dist/TvoyMeet;TvoyMeet" `
+            --collect-all customtkinter `
+            installer.py
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TvoyMeet-windows
+          path: dist/TvoyMeetInstaller.exe
+          retention-days: 30
