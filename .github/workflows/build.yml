@@ -1,15 +1,14 @@
 name: Build TvoyMeet
 
 on:
-  workflow_dispatch:   # запуск вручную кнопкой на GitHub
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'           # или автоматически при тэге v1.0, v1.1 и т.д.
+      - 'v*'
 
 jobs:
-  # ── Mac .app ──────────────────────────────────────────────────────────────
   build-mac:
-    runs-on: macos-latest   # Apple Silicon (M1/M2/M3)
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -24,11 +23,12 @@ jobs:
           cp $(which ffmpeg) ./ffmpeg
 
       - name: Install Python deps
-        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller
+        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller pillow
 
       - name: Build .app
         run: |
           pyinstaller --noconfirm --windowed --name TvoyMeet \
+            --icon icon.icns \
             --collect-all customtkinter \
             --collect-all tkinterdnd2 \
             --add-binary "./ffmpeg:." \
@@ -46,7 +46,12 @@ jobs:
           path: dist/TvoyMeet-mac.zip
           retention-days: 30
 
-  # ── Windows Installer ─────────────────────────────────────────────────────
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TvoyMeet-mac.zip
+
   build-windows:
     runs-on: windows-latest
 
@@ -68,26 +73,28 @@ jobs:
           Remove-Item -Recurse -Force ffmpeg.zip, ffmpeg_tmp
 
       - name: Install Python deps
-        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller
+        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller pillow
 
       - name: Build TvoyMeet (onedir)
+        shell: pwsh
         run: |
           pyinstaller --noconfirm --onedir --windowed --name TvoyMeet `
+            --icon icon.ico `
             --collect-all customtkinter `
             --collect-all tkinterdnd2 `
             --add-binary "ffmpeg.exe;." `
             --hidden-import faster_whisper `
             --hidden-import ctranslate2 `
             transcriber.py
-        shell: pwsh
 
       - name: Build Installer (onefile)
+        shell: pwsh
         run: |
           pyinstaller --noconfirm --onefile --windowed --name TvoyMeetInstaller `
+            --icon icon.ico `
             --add-data "dist/TvoyMeet;TvoyMeet" `
             --collect-all customtkinter `
             installer.py
-        shell: pwsh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -95,3 +102,9 @@ jobs:
           name: TvoyMeet-windows
           path: dist/TvoyMeetInstaller.exe
           retention-days: 30
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TvoyMeetInstaller.exe
