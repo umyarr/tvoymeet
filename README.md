@@ -16,8 +16,21 @@
 
 Смотри раздел [Releases](../../releases) — там готовые сборки:
 
-- `TvoyMeet-mac.zip` — приложение для macOS (Apple Silicon)
+- `TvoyMeet-mac.zip` — приложение для macOS
 - `TvoyMeetInstaller.exe` — установщик для Windows
+
+### Первый запуск на macOS
+
+macOS блокирует приложения без подписи Apple. Два способа обойти:
+
+**Способ 1 — через Терминал** (надёжнее):
+```bash
+xattr -cr ~/Downloads/TvoyMeet.app
+open ~/Downloads/TvoyMeet.app
+```
+
+**Способ 2 — через Finder**:
+Правый клик на `TvoyMeet.app` → **Открыть** → **Открыть** в диалоге.
 
 ## Запуск из исходников
 
@@ -40,6 +53,6 @@ python transcriber.py
 
 - [customtkinter](https://github.com/TomSchimansky/CustomTkinter) — интерфейс
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — транскрибация
-- [tkinterdnd2](https://github.com/pmgagne/tkinterdnd2) — drag & drop
+- [tkinterdnd2](https://github.com/pmgagne/tkinterdnd2) — drag & drop (только Windows)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — скачивание по ссылке
 - PyInstaller — сборка в .exe / .app

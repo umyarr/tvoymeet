@@ -38,6 +38,9 @@ jobs:
             --hidden-import ctranslate2 \
             transcriber.py
 
+      - name: Sign .app (ad-hoc)
+        run: codesign --force --deep --sign - dist/TvoyMeet.app
+
       - name: Zip .app for download
         run: cd dist && zip -r TvoyMeet-mac.zip TvoyMeet.app
 
