@@ -8,7 +8,13 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 from PIL import Image
-from tkinterdnd2 import DND_FILES, TkinterDnD
+
+_DND = sys.platform != 'darwin'
+if _DND:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+    _extra_base: tuple = (TkinterDnD.DnDWrapper,)
+else:
+    _extra_base = ()
 
 
 def _ffmpeg() -> str:
@@ -57,10 +63,11 @@ LANGUAGES      = ["ru", "en", "auto"]
 BITRATES       = ["64k", "48k", "96k", "128k"]
 
 
-class App(ctk.CTk, TkinterDnD.DnDWrapper):
+class App(ctk.CTk, *_extra_base):
     def __init__(self):
         super().__init__()
-        self.TkdndVersion = TkinterDnD._require(self)
+        if _DND:
+            self.TkdndVersion = TkinterDnD._require(self)
         self.title("ТвойMeet")
         self.geometry("640x940")
         self.resizable(True, True)
@@ -110,36 +117,51 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         c1 = self._card(s)
         self._card_title(c1, "1", "Источник")
 
-        self.drop_frame = ctk.CTkFrame(
-            c1, fg_color=C_DROPBG, corner_radius=8,
-            border_width=1, border_color=C_DROPBRD, height=120,
-        )
-        self.drop_frame.pack(fill="x", pady=(0, 10))
-        self.drop_frame.pack_propagate(False)
+        if _DND:
+            self.drop_frame = ctk.CTkFrame(
+                c1, fg_color=C_DROPBG, corner_radius=8,
+                border_width=1, border_color=C_DROPBRD, height=120,
+            )
+            self.drop_frame.pack(fill="x", pady=(0, 10))
+            self.drop_frame.pack_propagate(False)
 
-        drop_inner = ctk.CTkFrame(self.drop_frame, fg_color="transparent")
-        drop_inner.place(relx=0.5, rely=0.5, anchor="center")
+            drop_inner = ctk.CTkFrame(self.drop_frame, fg_color="transparent")
+            drop_inner.place(relx=0.5, rely=0.5, anchor="center")
 
-        self.drop_label = ctk.CTkLabel(
-            drop_inner,
-            text="Перетащи файл сюда",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=C_ACCENT,
-        )
-        self.drop_label.pack()
-        ctk.CTkLabel(drop_inner, text="или", font=ctk.CTkFont(size=11),
-                     text_color=C_GRAY).pack(pady=2)
-        ctk.CTkButton(
-            drop_inner, text="Выбрать на диске", command=self._open_file,
-            fg_color=C_ACCENT, hover_color=C_PRIM_H,
-            font=ctk.CTkFont(size=12, weight="bold"),
-            width=150, height=30, corner_radius=6,
-        ).pack()
+            self.drop_label = ctk.CTkLabel(
+                drop_inner,
+                text="Перетащи файл сюда",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color=C_ACCENT,
+            )
+            self.drop_label.pack()
+            ctk.CTkLabel(drop_inner, text="или", font=ctk.CTkFont(size=11),
+                         text_color=C_GRAY).pack(pady=2)
+            ctk.CTkButton(
+                drop_inner, text="Выбрать на диске", command=self._open_file,
+                fg_color=C_ACCENT, hover_color=C_PRIM_H,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                width=150, height=30, corner_radius=6,
+            ).pack()
 
-        self.drop_label.drop_target_register(DND_FILES)
-        self.drop_label.dnd_bind("<<Drop>>", self._on_drop)
-        self.drop_frame.drop_target_register(DND_FILES)
-        self.drop_frame.dnd_bind("<<Drop>>", self._on_drop)
+            self.drop_label.drop_target_register(DND_FILES)
+            self.drop_label.dnd_bind("<<Drop>>", self._on_drop)
+            self.drop_frame.drop_target_register(DND_FILES)
+            self.drop_frame.dnd_bind("<<Drop>>", self._on_drop)
+        else:
+            self.drop_label = None
+            _btn_frame = ctk.CTkFrame(
+                c1, fg_color=C_DROPBG, corner_radius=8,
+                border_width=1, border_color=C_DROPBRD, height=80,
+            )
+            _btn_frame.pack(fill="x", pady=(0, 10))
+            _btn_frame.pack_propagate(False)
+            ctk.CTkButton(
+                _btn_frame, text="Выбрать файл на диске", command=self._open_file,
+                fg_color=C_ACCENT, hover_color=C_PRIM_H,
+                font=ctk.CTkFont(size=13, weight="bold"),
+                width=200, height=40, corner_radius=6,
+            ).place(relx=0.5, rely=0.5, anchor="center")
 
         self.file_label = ctk.CTkLabel(
             c1, text="Файл не выбран",
@@ -282,6 +304,14 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         md_wrap = ctk.CTkFrame(s, fg_color="transparent")
         md_wrap.pack(fill="x", padx=16, pady=8)
         ctk.CTkButton(
+            md_wrap, text="Редактировать промпт для LLM",
+            command=self._edit_prompt_template,
+            fg_color=C_CARD, hover_color=C_SEP,
+            border_width=1, border_color=C_DROPBRD,
+            text_color=C_GRAY, font=ctk.CTkFont(size=12),
+            height=32, corner_radius=8,
+        ).pack(fill="x", pady=(0, 6))
+        ctk.CTkButton(
             md_wrap, text="Собрать .md для LLM",
             command=self._build_md,
             fg_color=C_GREEN, hover_color=C_GREEN_H,
@@ -357,7 +387,8 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
         self.json_path      = None
         name = Path(path).name
         self.file_label.configure(text=name, text_color=C_GREEN)
-        self.drop_label.configure(text=f"✓  {name}", text_color=C_GREEN)
+        if self.drop_label:
+            self.drop_label.configure(text=f"✓  {name}", text_color=C_GREEN)
         self._log(f"> Файл: {path}")
 
     # ── yt-dlp ──────────────────────────────────────────────────────────────
@@ -485,6 +516,16 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
 
     # ── MD builder ──────────────────────────────────────────────────────────
 
+    def _edit_prompt_template(self):
+        path = _prompt_template_path()
+        if not path.exists():
+            path.write_text(_default_prompt_header(), encoding='utf-8')
+        if sys.platform == 'darwin':
+            subprocess.Popen(['open', '-e', str(path)])
+        else:
+            subprocess.Popen(['notepad', str(path)])
+        self._log(f"> Открыт редактор: {path.name}")
+
     def _build_md(self):
         json_p = self.json_path
         if not json_p and self.output_dir:
@@ -495,10 +536,23 @@ class App(ctk.CTk, TkinterDnD.DnDWrapper):
             self._log("! Нет JSON — сначала транскрибируй")
             return
         try:
-            data = json.loads(Path(json_p).read_text(encoding="utf-8"))
-            out  = Path(json_p).with_suffix(".md")
-            out.write_text(build_md_text(data, Path(json_p).stem), encoding="utf-8")
-            self._log(f"✓ MD готов: {out.name}")
+            data      = json.loads(Path(json_p).read_text(encoding="utf-8"))
+            base_name = Path(json_p).stem
+            language  = data.get("language", "unknown")
+            segments  = data.get("segments", [])
+            full_text = data.get("text", "").strip()
+            duration  = float(segments[-1].get("end", 0)) if segments else 0
+            out_dir   = Path(json_p).parent
+
+            transcript_md = _build_transcript_md(base_name, language, duration, segments)
+            report_md     = _build_report_md(base_name, language, duration, segments, full_text)
+            prompt_md     = _get_prompt_template() + report_md
+
+            (out_dir / f"{base_name}_transcript.md").write_text(transcript_md, encoding='utf-8')
+            (out_dir / f"{base_name}_report.md").write_text(report_md, encoding='utf-8')
+            (out_dir / f"{base_name}_prompt_for_llm.md").write_text(prompt_md, encoding='utf-8')
+
+            self._log(f"✓ Готово: 3 файла → {out_dir.name}/")
         except Exception as e:
             self._log(f"! Ошибка: {e}")
 
@@ -530,37 +584,176 @@ def build_ffmpeg_cmd(src: str, fmt: str, bitrate: str,
     return cmd
 
 
-def build_md_text(data: dict, stem: str) -> str:
-    text     = data.get("text", "")
-    lang     = data.get("language", "?")
-    duration = data.get("duration", 0)
-    return f"""# Транскрипт: {stem}
+def _format_time(seconds: float) -> str:
+    total = int(seconds)
+    return f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
 
-**Язык:** {lang}
-**Длительность:** {duration / 60:.1f} мин
 
----
+def _prompt_template_path() -> Path:
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent / 'prompt_template.txt'
+    return Path(__file__).parent / 'prompt_template.txt'
 
-## Полная транскрибация
 
-{text}
+def _default_prompt_header() -> str:
+    return """\
+Ты редактор, смысловой аналитик и сборщик сильных идей.
 
----
+Перед тобой транскрипт аудио или видео.
 
-## Prompt для LLM
+Твоя задача — НЕ делать учебный тест, НЕ делать формальный отчёт и НЕ превращать материал в школьный конспект.
 
-Перед тобой полная транскрибация аудио.
+Твоя задача — забрать из материала всё самое ценное, живое и сильное:
+- идеи
+- инсайты
+- удачные формулировки
+- смыслы
+- тезисы
+- цитаты
+- то, что можно использовать дальше
 
-Сделай следующее:
+# Требуемая структура
 
-1. Главное в одном абзаце
-2. Ключевые идеи
-3. Сильные формулировки
-4. Что можно использовать для инфографики
-5. Что можно выкинуть
+## 1. Главное в одном абзаце
+Сформулируй, о чём это аудио на самом деле.
+Не пересказывай механически. Дай смысловую суть.
 
-Формат строго Markdown. Не добавляй факты, которых нет в материале.
+## 2. Самые сильные идеи
+Выдели 10–15 главных идей.
+Не иди подряд по транскрипту.
+Выбирай только то, что имеет смысловую ценность.
+
+У каждой идеи:
+- короткий заголовок
+- объяснение
+- таймкод, если он есть в транскрипте
+
+## 3. Сильные формулировки
+Вытащи яркие, точные, необычные или полезные формулировки.
+
+Разделяй:
+- точная цитата
+- смысловая формулировка
+
+Если фраза распознана плохо, помечай:
+[требует проверки по аудио]
+
+## 4. Что можно использовать дальше
+
+### Для поста
+Что можно превратить в пост или короткую публикацию.
+
+### Для выступления
+Что можно использовать в речи, лекции, презентации.
+
+### Для методички
+Что можно превратить в материал, инструкцию, упражнение или объяснение.
+
+### Для обсуждения с командой
+Что можно вынести на командное обсуждение.
+
+### Для личной рефлексии
+Что стоит сохранить как мысль для себя.
+
+## 5. Смысловая карта материала
+Покажи, как разворачивается мысль:
+
+```text
+проблема → ключевые идеи → поворотные мысли → выводы
+```
+
+## 6. Неочевидные инсайты
+Выдели то, что не лежит на поверхности, но может быть важным.
+
+## 7. Жёсткая выжимка
+Сделай 7 пунктов, которые точно стоит сохранить.
+
+## 8. Что можно выкинуть
+Кратко укажи, какие части материала выглядят техническими, проходными, повторяющимися или малозначимыми.
+
+# Правила
+
+- Не делай тестовые вопросы.
+- Не делай задания ради заданий.
+- Не делай школьный конспект.
+- Не добавляй искусственную методическую структуру, если её нет в материале.
+- Не выдумывай факты.
+- Не добавляй того, чего нет в транскрипте.
+- Не исправляй смысл.
+- Если транскрипт распознан криво, восстанавливай смысл осторожно.
+- Пиши живо, но структурно.
+- Главная цель: сохранить самое ценное из аудио.
+- Формат строго Markdown.
+- Пиши на русском языке.
+
+# Исходный материал
+
 """
+
+
+def _get_prompt_template() -> str:
+    p = _prompt_template_path()
+    return p.read_text(encoding='utf-8') if p.exists() else _default_prompt_header()
+
+
+def _build_transcript_md(base_name: str, language: str, duration: float, segments: list) -> str:
+    lines = [
+        f"# Транскрипт: {base_name}", "",
+        "## Метаданные", "",
+        f"- Язык: `{language}`",
+        f"- Длительность: `{_format_time(duration)}`",
+        f"- Количество сегментов: `{len(segments)}`", "",
+        "## Транскрипт с таймкодами", "",
+    ]
+    current_minute = None
+    for seg in segments:
+        start = float(seg.get("start", 0))
+        text  = seg.get("text", "").strip()
+        if not text:
+            continue
+        minute = int(start // 60)
+        if minute != current_minute:
+            current_minute = minute
+            lines += ["", f"### {_format_time(start)}", ""]
+        lines.append(text)
+    return "\n".join(lines)
+
+
+def _build_report_md(base_name: str, language: str, duration: float, segments: list, full_text: str) -> str:
+    lines = [
+        f"# Отчёт: {base_name}", "",
+        "## Метаданные", "",
+        f"- Язык: `{language}`",
+        f"- Длительность: `{_format_time(duration)}`",
+        f"- Количество сегментов: `{len(segments)}`", "",
+        "## Супер краткое содержание", "",
+        "> Здесь будет саммари после обработки через LLM.", "",
+        "## Саммари по темам", "",
+        "> Здесь будут смысловые блоки после обработки через LLM.", "",
+        "## Ключевые идеи", "",
+        "> Здесь будут ключевые идеи после обработки через LLM.", "",
+        "## Практические выводы", "",
+        "> Здесь будут практические выводы после обработки через LLM.", "",
+        "## Задачи / действия", "",
+        "> Здесь будут задания и действия после обработки через LLM.", "",
+        "## Цитаты и сильные формулировки", "",
+        "> Здесь будут цитаты после обработки через LLM.", "",
+        "## Полный текст", "",
+        full_text, "",
+        "## Транскрипт с таймкодами", "",
+    ]
+    current_minute = None
+    for seg in segments:
+        start = float(seg.get("start", 0))
+        text  = seg.get("text", "").strip()
+        if not text:
+            continue
+        minute = int(start // 60)
+        if minute != current_minute:
+            current_minute = minute
+            lines += ["", f"### {_format_time(start)}", ""]
+        lines.append(text)
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

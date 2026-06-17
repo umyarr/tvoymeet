@@ -26,14 +26,13 @@ jobs:
           cp $(which ffmpeg) ./ffmpeg
 
       - name: Install Python deps
-        run: pip install customtkinter tkinterdnd2 faster-whisper pyinstaller pillow
+        run: pip install customtkinter faster-whisper pyinstaller pillow
 
       - name: Build .app
         run: |
           pyinstaller --noconfirm --windowed --name TvoyMeet \
             --icon icon.icns \
             --collect-all customtkinter \
-            --collect-all tkinterdnd2 \
             --add-binary "./ffmpeg:." \
             --hidden-import faster_whisper \
             --hidden-import ctranslate2 \
