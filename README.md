@@ -1,38 +1,40 @@
-# ТвойMeet
+🌐 [Русский](translations/ru/README.md) | [中文](translations/zh/README.md)
 
-Транскрибация аудио и видео прямо на компьютере. Без облаков. Без подписок.
+# TvoyMeet
 
-![ТвойMeet](tvoymeet_app_icon_1781528482998.jpg)
+Local audio and video transcription. No cloud. No subscriptions.
 
-## Что умеет
+![TvoyMeet](tvoymeet_app_icon_1781528482998.jpg)
 
-- Перетащить файл или вставить ссылку (YouTube, VK, Rutube и др.)
-- Извлечь аудио через FFmpeg с обрезкой по времени
-- Транскрибировать через Whisper локально (модели от tiny до large-v3)
-- Сохранить результат в txt, json, srt, vtt, tsv
-- Собрать `.md` с транскриптом и промптом для LLM
+## Features
 
-## Скачать
+- Drag & drop a file or paste a link (YouTube, VK, Rutube, etc.)
+- Extract audio via FFmpeg with time-based trimming
+- Transcribe locally with Whisper (models from tiny to large-v3)
+- Export to txt, json, srt, vtt, tsv
+- Generate a `.md` file with transcript and LLM-ready prompt
 
-Смотри раздел [Releases](../../releases) — там готовые сборки:
+## Download
 
-- `TvoyMeet-mac.zip` — приложение для macOS
-- `TvoyMeetInstaller.exe` — установщик для Windows
+See [Releases](../../releases) for prebuilt binaries:
 
-### Первый запуск на macOS
+- `TvoyMeet-mac.zip` — macOS app
+- `TvoyMeetInstaller.exe` — Windows installer
 
-macOS блокирует приложения без подписи Apple. Два способа обойти:
+### First launch on macOS
 
-**Способ 1 — через Терминал** (надёжнее):
+macOS blocks unsigned apps. Two ways to bypass:
+
+**Option 1 — Terminal** (recommended):
 ```bash
 xattr -cr ~/Downloads/TvoyMeet.app
 open ~/Downloads/TvoyMeet.app
 ```
 
-**Способ 2 — через Finder**:
-Правый клик на `TvoyMeet.app` → **Открыть** → **Открыть** в диалоге.
+**Option 2 — Finder**:
+Right-click `TvoyMeet.app` → **Open** → **Open** in the dialog.
 
-## Запуск из исходников
+## Run from source
 
 ```bash
 git clone https://github.com/umyarr/tvoymeet
@@ -47,12 +49,12 @@ pip install -r requirements.txt
 python transcriber.py
 ```
 
-Нужен ffmpeg в системе или рядом с `transcriber.py`.
+FFmpeg must be installed or placed next to `transcriber.py`.
 
-## Стек
+## Stack
 
-- [customtkinter](https://github.com/TomSchimansky/CustomTkinter) — интерфейс
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — транскрибация
-- [tkinterdnd2](https://github.com/pmgagne/tkinterdnd2) — drag & drop (только Windows)
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — скачивание по ссылке
-- PyInstaller — сборка в .exe / .app
+- [customtkinter](https://github.com/TomSchimansky/CustomTkinter) — UI
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — transcription
+- [tkinterdnd2](https://github.com/pmgagne/tkinterdnd2) — drag & drop (Windows only)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — download from URL
+- PyInstaller — build to .exe / .app
