@@ -512,57 +512,59 @@ class App(ctk.CTk, *_extra_base):
 
     def _whisper_worker(self, audio_path: str):
         try:
-            from faster_whisper import WhisperModel
-        except ImportError:
-            self._log("! faster-whisper не установлен: pip install faster-whisper")
-            return
-        model_name = self.model_var.get()
-        lang = self.lang_var.get() or None
-        if lang == "auto":
-            lang = None
-        audio   = Path(audio_path)
-        out_dir = audio.parent / f"transcripts_{audio.stem}"
-        out_dir.mkdir(exist_ok=True)
-        self.output_dir = str(out_dir)
-        self._log(f"> Загружаю модель {model_name}... (первый раз — скачивается)")
-        try:
-            model = WhisperModel(model_name, device="cpu", compute_type="int8")
-            self._log(f"> Транскрибирую: {audio.name}")
-            segs_raw, info = model.transcribe(audio_path, language=lang, beam_size=5)
-            segs, texts = [], []
-            for seg in segs_raw:
-                t = seg.text.strip()
-                segs.append({"start": seg.start, "end": seg.end, "text": t})
-                texts.append(t)
-                self._log(f"  [{seg.start:.0f}s] {t[:70]}")
-            base     = out_dir / audio.stem
-            selected = {f for f, v in self.fmt_vars.items() if v.get()}
-            if "txt" in selected:
-                (base.with_suffix(".txt")).write_text("\n".join(texts), encoding="utf-8")
-            json_data = {"language": info.language, "duration": info.duration,
-                         "text": " ".join(texts), "segments": segs}
-            if "json" in selected:
-                jf = base.with_suffix(".json")
-                jf.write_text(json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8")
-                self.json_path = str(jf)
-            if "srt" in selected:
-                lines = []
-                for i, seg in enumerate(segs, 1):
-                    lines += [str(i), f"{_srt_t(seg['start'])} --> {_srt_t(seg['end'])}", seg["text"], ""]
-                (base.with_suffix(".srt")).write_text("\n".join(lines), encoding="utf-8")
-            if "vtt" in selected:
-                lines = ["WEBVTT", ""]
-                for seg in segs:
-                    lines += [f"{_vtt_t(seg['start'])} --> {_vtt_t(seg['end'])}", seg["text"], ""]
-                (base.with_suffix(".vtt")).write_text("\n".join(lines), encoding="utf-8")
-            if "tsv" in selected:
-                lines = ["start\tend\ttext"] + [
-                    f"{seg['start']:.3f}\t{seg['end']:.3f}\t{seg['text']}" for seg in segs]
-                (base.with_suffix(".tsv")).write_text("\n".join(lines), encoding="utf-8")
-            self._log(f"✓ Готово → {out_dir}")
-        except Exception as e:
-            self._log(f"! Ошибка Whisper: {e}")
-        self.after(0, self._set_busy, False)
+            try:
+                from faster_whisper import WhisperModel
+            except ImportError:
+                self._log("! faster-whisper не установлен: pip install faster-whisper")
+                return
+            model_name = self.model_var.get()
+            lang = self.lang_var.get() or None
+            if lang == "auto":
+                lang = None
+            audio   = Path(audio_path)
+            out_dir = audio.parent / f"transcripts_{audio.stem}"
+            out_dir.mkdir(exist_ok=True)
+            self.output_dir = str(out_dir)
+            self._log(f"> Загружаю модель {model_name}... (первый раз — скачивается)")
+            try:
+                model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                self._log(f"> Транскрибирую: {audio.name}")
+                segs_raw, info = model.transcribe(audio_path, language=lang, beam_size=5)
+                segs, texts = [], []
+                for seg in segs_raw:
+                    t = seg.text.strip()
+                    segs.append({"start": seg.start, "end": seg.end, "text": t})
+                    texts.append(t)
+                    self._log(f"  [{seg.start:.0f}s] {t[:70]}")
+                base     = out_dir / audio.stem
+                selected = {f for f, v in self.fmt_vars.items() if v.get()}
+                if "txt" in selected:
+                    (base.with_suffix(".txt")).write_text("\n".join(texts), encoding="utf-8")
+                json_data = {"language": info.language, "duration": info.duration,
+                             "text": " ".join(texts), "segments": segs}
+                if "json" in selected:
+                    jf = base.with_suffix(".json")
+                    jf.write_text(json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                    self.json_path = str(jf)
+                if "srt" in selected:
+                    lines = []
+                    for i, seg in enumerate(segs, 1):
+                        lines += [str(i), f"{_srt_t(seg['start'])} --> {_srt_t(seg['end'])}", seg["text"], ""]
+                    (base.with_suffix(".srt")).write_text("\n".join(lines), encoding="utf-8")
+                if "vtt" in selected:
+                    lines = ["WEBVTT", ""]
+                    for seg in segs:
+                        lines += [f"{_vtt_t(seg['start'])} --> {_vtt_t(seg['end'])}", seg["text"], ""]
+                    (base.with_suffix(".vtt")).write_text("\n".join(lines), encoding="utf-8")
+                if "tsv" in selected:
+                    lines = ["start\tend\ttext"] + [
+                        f"{seg['start']:.3f}\t{seg['end']:.3f}\t{seg['text']}" for seg in segs]
+                    (base.with_suffix(".tsv")).write_text("\n".join(lines), encoding="utf-8")
+                self._log(f"✓ Готово → {out_dir}")
+            except Exception as e:
+                self._log(f"! Ошибка Whisper: {e}")
+        finally:
+            self.after(0, self._set_busy, False)
 
     # ── Auto-update ─────────────────────────────────────────────────────────
 
