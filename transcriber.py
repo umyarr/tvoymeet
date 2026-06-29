@@ -63,7 +63,7 @@ WHISPER_MODELS = ["turbo", "large-v3", "medium", "small", "base", "tiny"]
 LANGUAGES      = ["ru", "en", "auto"]
 BITRATES       = ["64k", "48k", "96k", "128k"]
 
-APP_VERSION  = "1.0.5"
+APP_VERSION  = "1.0.6"
 GITHUB_REPO  = "umyarr/tvoymeet"
 
 
