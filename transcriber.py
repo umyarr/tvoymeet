@@ -1,4 +1,5 @@
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -62,6 +63,9 @@ WHISPER_MODELS = ["turbo", "large-v3", "medium", "small", "base", "tiny"]
 LANGUAGES      = ["ru", "en", "auto"]
 BITRATES       = ["64k", "48k", "96k", "128k"]
 
+APP_VERSION  = "1.0.4"
+GITHUB_REPO  = "umyarr/tvoymeet"
+
 
 class App(ctk.CTk, *_extra_base):
     def __init__(self):
@@ -78,8 +82,10 @@ class App(ctk.CTk, *_extra_base):
         self.processed_file: str | None = None
         self.output_dir:     str | None = None
         self.json_path:      str | None = None
+        self._busy:          bool = False
 
         self._build_ui()
+        threading.Thread(target=self._check_update_bg, daemon=True).start()
 
     # ── UI ──────────────────────────────────────────────────────────────────
 
@@ -179,10 +185,11 @@ class App(ctk.CTk, *_extra_base):
             fg_color=C_CARD, border_color=C_DROPBRD, text_color=C_TEXT, height=34,
         )
         self.yt_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        ctk.CTkButton(
+        self._btn_ytdlp = ctk.CTkButton(
             yt_row, text="Скачать", command=self._run_ytdlp,
             fg_color=C_YTDL, hover_color=C_YTDL_H, width=100, height=34, corner_radius=6,
-        ).pack(side="left")
+        )
+        self._btn_ytdlp.pack(side="left")
 
         yt_mode_row = ctk.CTkFrame(c1, fg_color="transparent")
         yt_mode_row.pack(anchor="w", pady=(6, 0))
@@ -249,12 +256,13 @@ class App(ctk.CTk, *_extra_base):
         self.end_entry.pack(side="left", padx=8)
         self._toggle_cut()
 
-        ctk.CTkButton(
+        self._btn_ffmpeg = ctk.CTkButton(
             c2, text="Обработать FFmpeg", command=self._run_ffmpeg,
             fg_color=C_AMBER, hover_color=C_AMBER_H,
             text_color="#1a1a1a", font=ctk.CTkFont(size=13, weight="bold"),
             height=38, corner_radius=8,
-        ).pack(fill="x")
+        )
+        self._btn_ffmpeg.pack(fill="x")
 
         # ── Card 3: Whisper ──────────────────────────────────────────────────
         c3 = self._card(s)
@@ -293,12 +301,13 @@ class App(ctk.CTk, *_extra_base):
                 checkmark_color="#FFFFFF", text_color=C_TEXT, corner_radius=4,
             ).pack(side="left", padx=4)
 
-        ctk.CTkButton(
+        self._btn_whisper = ctk.CTkButton(
             c3, text="Транскрибировать", command=self._run_whisper,
             fg_color=C_ACCENT, hover_color=C_PRIM_H,
             font=ctk.CTkFont(size=13, weight="bold"),
             height=38, corner_radius=8,
-        ).pack(fill="x")
+        )
+        self._btn_whisper.pack(fill="x")
 
         # ── MD button ────────────────────────────────────────────────────────
         md_wrap = ctk.CTkFrame(s, fg_color="transparent")
@@ -360,6 +369,20 @@ class App(ctk.CTk, *_extra_base):
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
 
+    def _log_replace_last(self, msg: str):
+        self.log_box.configure(state="normal")
+        self.log_box.delete("end-1l", "end")
+        self.log_box.insert("end", msg + "\n")
+        self.log_box.see("end")
+        self.log_box.configure(state="disabled")
+
+    def _set_busy(self, busy: bool):
+        self._busy = busy
+        state = "disabled" if busy else "normal"
+        self._btn_ffmpeg.configure(state=state)
+        self._btn_whisper.configure(state=state)
+        self._btn_ytdlp.configure(state=state)
+
     def _toggle_cut(self):
         s = "normal" if self.cut_mode.get() == "fragment" else "disabled"
         self.start_entry.configure(state=s)
@@ -398,20 +421,38 @@ class App(ctk.CTk, *_extra_base):
         if not url:
             self._log("! Вставь ссылку")
             return
+        if self._busy:
+            return
+        self._set_busy(True)
         threading.Thread(target=self._ytdlp_worker, args=(url,), daemon=True).start()
 
     def _ytdlp_worker(self, url: str):
         out_dir = Path.home() / "Downloads"
         out_tpl = str(out_dir / "source.%(ext)s")
         if self.yt_mode.get() == "video":
-            cmd = ["yt-dlp", "-f", "bv*+ba/b", "-o", out_tpl, url]
+            cmd = ["yt-dlp", "-f", "bv*+ba/b", "--newline", "-o", out_tpl, url]
             ext, label = "mp4", "видео"
         else:
-            cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", out_tpl, url]
+            cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "--newline", "-o", out_tpl, url]
             ext, label = "mp3", "аудио"
         self._log(f"> yt-dlp: скачиваю {label}...")
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if res.returncode == 0:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+        )
+        last_was_progress = False
+        for line in proc.stdout:
+            line = line.rstrip()
+            if not line:
+                continue
+            is_progress = line.startswith("[download]") and "%" in line
+            if is_progress and last_was_progress:
+                self._log_replace_last(line)
+            else:
+                self._log(line)
+            last_was_progress = is_progress
+        proc.wait()
+        if proc.returncode == 0:
             files = sorted(out_dir.glob(f"*.{ext}"), key=lambda f: f.stat().st_mtime, reverse=True)
             if files:
                 self._set_file(str(files[0]))
@@ -419,7 +460,8 @@ class App(ctk.CTk, *_extra_base):
             else:
                 self._log("! Файл не найден после скачивания")
         else:
-            self._log("! Ошибка yt-dlp:\n" + "\n".join(res.stderr.splitlines()[-6:]))
+            self._log("! Ошибка yt-dlp")
+        self.after(0, self._set_busy, False)
 
     # ── FFmpeg ──────────────────────────────────────────────────────────────
 
@@ -427,6 +469,9 @@ class App(ctk.CTk, *_extra_base):
         if not self.source_file:
             self._log("! Выбери файл или скачай по ссылке")
             return
+        if self._busy:
+            return
+        self._set_busy(True)
         threading.Thread(target=self._ffmpeg_worker, daemon=True).start()
 
     def _ffmpeg_worker(self):
@@ -451,6 +496,7 @@ class App(ctk.CTk, *_extra_base):
             self._log(f"✓ Аудио готово: {out.name}")
         else:
             self._log("! Ошибка FFmpeg:\n" + "\n".join(res.stderr.splitlines()[-8:]))
+        self.after(0, self._set_busy, False)
 
     # ── Whisper ─────────────────────────────────────────────────────────────
 
@@ -459,6 +505,9 @@ class App(ctk.CTk, *_extra_base):
         if not target:
             self._log("! Сначала выбери файл")
             return
+        if self._busy:
+            return
+        self._set_busy(True)
         threading.Thread(target=self._whisper_worker, args=(target,), daemon=True).start()
 
     def _whisper_worker(self, audio_path: str):
@@ -513,6 +562,77 @@ class App(ctk.CTk, *_extra_base):
             self._log(f"✓ Готово → {out_dir}")
         except Exception as e:
             self._log(f"! Ошибка Whisper: {e}")
+        self.after(0, self._set_busy, False)
+
+    # ── Auto-update ─────────────────────────────────────────────────────────
+
+    def _check_update_bg(self):
+        try:
+            import urllib.request, json as _json
+            url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            req = urllib.request.Request(url, headers={"User-Agent": "TvoyMeet"})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = _json.loads(r.read())
+            tag = data.get("tag_name", "")
+            if _is_newer(tag, APP_VERSION):
+                assets = {a["name"]: a["browser_download_url"] for a in data.get("assets", [])}
+                key = "TvoyMeet-mac.zip" if sys.platform == "darwin" else "TvoyMeetInstaller.exe"
+                dl_url = assets.get(key)
+                if dl_url:
+                    self.after(0, self._show_update_dialog, tag, dl_url)
+        except Exception:
+            pass
+
+    def _show_update_dialog(self, version: str, url: str):
+        from tkinter import messagebox
+        if messagebox.askyesno("Обновление", f"Доступна версия {version}.\nУстановить сейчас?"):
+            threading.Thread(target=self._install_update, args=(url,), daemon=True).start()
+
+    def _install_update(self, url: str):
+        import tempfile, urllib.request as _ureq
+        tmp_dir = Path(tempfile.mkdtemp())
+        dest = tmp_dir / url.split("/")[-1]
+        self._log("> Скачиваю обновление...")
+        def reporthook(count, block, total):
+            if total > 0:
+                pct = min(100, int(count * block * 100 / total))
+                self._log_replace_last(f"> Скачиваю обновление... {pct}%")
+        _ureq.urlretrieve(url, dest, reporthook)
+        self._log("> Устанавливаю...")
+        if sys.platform == "darwin":
+            self._install_mac(dest, tmp_dir)
+        else:
+            self._install_windows(dest)
+
+    def _install_mac(self, zip_path: Path, tmp_dir: Path):
+        import zipfile
+        with zipfile.ZipFile(zip_path) as zf:
+            zf.extractall(tmp_dir)
+        new_app = tmp_dir / "TvoyMeet.app"
+        if not new_app.exists():
+            self._log("! Не найдено TvoyMeet.app в архиве")
+            return
+        if not getattr(sys, "frozen", False):
+            self._log("! Автообновление работает только в собранном приложении")
+            return
+        current_app = Path(sys.executable).parents[2]
+        script = tmp_dir / "update.sh"
+        script.write_text(
+            f"#!/bin/bash\n"
+            f"while kill -0 {os.getpid()} 2>/dev/null; do sleep 0.3; done\n"
+            f'rm -rf "{current_app}"\n'
+            f'cp -R "{new_app}" "{current_app}"\n'
+            f'codesign --force --deep --sign - "{current_app}"\n'
+            f'open "{current_app}"\n',
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        subprocess.Popen(["bash", str(script)], close_fds=True)
+        self.after(0, self.destroy)
+
+    def _install_windows(self, exe_path: Path):
+        subprocess.Popen([str(exe_path)], creationflags=0x00000008)
+        self.after(0, self.destroy)
 
     # ── MD builder ──────────────────────────────────────────────────────────
 
@@ -558,6 +678,15 @@ class App(ctk.CTk, *_extra_base):
 
 
 # ── Pure functions ────────────────────────────────────────────────────────────
+
+def _is_newer(remote: str, current: str) -> bool:
+    def parse(v):
+        return tuple(int(x) for x in v.lstrip("v").split(".") if x.isdigit())
+    try:
+        return parse(remote) > parse(current)
+    except Exception:
+        return False
+
 
 def _srt_t(s: float) -> str:
     h   = int(s // 3600)
